@@ -1,4 +1,4 @@
-# discord2sheet-bot
+# GenerateTaskDiscordBot
 
 This bot allows GenerateTask users and accounts to interact with the leaderboards and offers other features centered around the game mode
 
