@@ -102,4 +102,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# project
 credentials.json
+discordbot_token.txt
