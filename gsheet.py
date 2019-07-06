@@ -2,23 +2,23 @@
 # Copyright (c) 2019, Hugonun(https://github.com/hugonun)
 # All rights reserved.
 
-from __future__ import print_function
-import pickle
 import os.path
-from time import time
+import re
 import gspread
+from time import time
+from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
-
-
-LEADERBOARDS_ID = '1Pb4p4qFPaJ2nA7ABwxVzazF2pYDiIVpoGHH-BolKtJY'
+from googleapiclient.discovery import build
 
 class gsheet(object):
+    LEADERBOARDS_ID = '1Pb4p4qFPaJ2nA7ABwxVzazF2pYDiIVpoGHH-BolKtJY'
+
     def getKnownTaskAccounts(self):
         scope = ['https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
         gsclient = gspread.authorize(creds)
-        sheet = gsclient.open_by_key(LEADERBOARDS_ID)
+        sheet = gsclient.open_by_key(self.LEADERBOARDS_ID)
         worksheet = sheet.worksheet("RawData")
     
     def updateTaskAccount(self, taskAccount):
@@ -74,7 +74,7 @@ class gsheet(object):
             'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
         gsclient = gspread.authorize(creds)
-        sheet = gsclient.open_by_key(LEADERBOARDS_ID)
+        sheet = gsclient.open_by_key(self.LEADERBOARDS_ID)
         worksheet = sheet.worksheet("RawData")
 
         values = [
@@ -106,13 +106,20 @@ class gsheet(object):
         #Add new row if the account was not on leaderboards yet
         worksheet.append_row(values)
 
-    def getCredsFromFile(self, nickname):
-        filepath = 'creds/' + nickname + '/token.pickle'
-        with open(filepath, 'rb') as token:
-            return pickle.load(token)
-    
-    def saveCredsToFile(self, creds, nickname):
-        filepath = 'creds/' + nickname + '/token.pickle'
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        with open(filepath, 'wb') as token:
-            pickle.dump(creds, token)
+    def getSpreadsheetLastUpdatedTime(self, spreadsheetUrl):
+        scope = ['https://spreadsheets.google.com/feeds',
+            'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
+        service = build('drive', 'v3', credentials=creds)
+        try:
+            result = service.files().get(fileId=self.getIdFromUrl(spreadsheetUrl), fields='modifiedTime').execute()
+        except Exception as e:
+            print(e)
+        unformatted = result.get('modifiedTime')
+        # fromisoformat does not support the letter timezone notation
+        ts = datetime.fromisoformat(unformatted.replace("Z", "+00:00")).timestamp()
+        return ts
+
+    def getIdFromUrl(self, url):
+        untrimmed = re.search('/[-\w]{25,}/', url).group()
+        return untrimmed[1:len(untrimmed)-1]
