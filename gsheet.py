@@ -20,40 +20,49 @@ class gsheet(object):
         gsclient = gspread.authorize(creds)
         sheet = gsclient.open_by_key(self.LEADERBOARDS_ID)
         worksheet = sheet.worksheet("RawData")
-    
+
     def updateTaskAccount(self, taskAccount):
         try:
             scope = ['https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive']
             creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
-            gsclient = gspread.authorize(creds)
-            sheet = gsclient.open_by_url(taskAccount.spreadsheetUrl)
 
-            ranges = [
-                ['Easy', 3],
-                ['Medium', 3],
-                ['Hard', 3],
-                ['Elite', 3],
-                ['Master', 3],
-                ['God', 3]
+            service = build('sheets', 'v4', credentials=creds)
+            sheet = service.spreadsheets()
+
+            range_names = [
+                'Easy!C2:C',
+                'Medium!C2:C',
+                'Hard!C2:C',
+                'Elite!C2:C',
+                'Master!C2:C',
+                'God!C2:C',
+                'DASHBOARD!B15'
             ]
 
+            result = sheet.values().batchGet(
+                spreadsheetId = self.getIdFromUrl(taskAccount.spreadsheetUrl),
+                ranges=range_names).execute()
+
             i = 0
-            difficultyCompletions = [0,0,0,0,0,0]
-            for range in ranges:
-                difficultyCompletions[i] = sheet.worksheet(range[0]).col_values(range[1])
+            difficultyCompletions = [[],[],[],[],[],[],[]]
+            for range in result.get('valueRanges', []):
+                difficultyCompletions[i] = range.get('values')
                 i+=1
 
             i = 0
             difficultyTotals = [0,0,0,0,0,0]
-            for difficultyCompletion in difficultyCompletions:
+            for difficultyCompletion in difficultyCompletions[:len(difficultyCompletions) - 2]:
                 count = 0
                 for taskCompletion in difficultyCompletion:
-                    if(taskCompletion == 'x'):
+                    if(len(taskCompletion) != 0):
                         count+=1
                 difficultyTotals[i] = count
                 i+=1
-            currentTask = sheet.worksheet('DASHBOARD').cell(15,2).value
+            if(len(difficultyCompletions[0][6]) != 0):
+                currentTask = difficultyCompletions[len(difficultyCompletions)-1][0][0]
+            else:
+                currentTask = 'None'
 
             taskAccount.easyProgress = int(difficultyTotals[0])
             taskAccount.mediumProgress = int(difficultyTotals[1])
@@ -62,12 +71,9 @@ class gsheet(object):
             taskAccount.masterProgress = int(difficultyTotals[4])
             taskAccount.godProgress = int(difficultyTotals[5])
             taskAccount.currentTask = currentTask
-            taskAccount.lastUpdated = time()
 
             self.updateLeaderboards(taskAccount)
-        except gspread.exceptions.APIError: raise 
-
-        
+        except Exception: raise
 
     def updateLeaderboards(self, taskAccount):
         scope = ['https://spreadsheets.google.com/feeds',

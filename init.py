@@ -1,6 +1,5 @@
 import discord
-import bisect
-import gspread.exceptions
+from time import time
 from asyncio import sleep
 from discord.ext import tasks
 
@@ -11,28 +10,31 @@ from taskAccountList import taskAccountList
 client = discord.Client()
 sheet = gsheet.gsheet()
 
-updatesPerCycle = 5
+maxChecksPerCycle = 50
+maxUpdatesPerCycle = 10
 taskAccountList = taskAccountList()
 
 @tasks.loop(minutes=2)
 async def updateTaskAccounts():
     taskAccounts = taskAccountList.taskAccounts
     print('Starting periodic update...')
-    accountsToUpdate = updatesPerCycle
+    accountsToCheck = maxChecksPerCycle
     if(len(taskAccounts) == 0):
         print('Finished periodic update')
         return
-    elif(len(taskAccounts) < updatesPerCycle):
-        accountsToUpdate = len(taskAccounts)
+    elif(len(taskAccounts) < accountsToCheck):
+        accountsToCheck = len(taskAccounts)
 
-    for taskAccount in taskAccounts[:accountsToUpdate]:
+    updatesThisCycle = 0
+    for taskAccount in taskAccountList.getOldestUpdatedAccounts(accountsToCheck):
         sheetLastUpdated = sheet.getSpreadsheetLastUpdatedTime(taskAccount.spreadsheetUrl)
-        if(sheetLastUpdated > taskAccount.lastUpdated):
+        if(sheetLastUpdated > taskAccount.lastUpdated and updatesThisCycle < maxUpdatesPerCycle):
             print(f'Updating {taskAccount.nickname}')
             sheet.updateTaskAccount(taskAccount)
-            await sleep(5)
+            updatesThisCycle += 1
+            await sleep(1)
+        taskAccountList.updateLastUpdated(taskAccount, time())
         await sleep(1)
-    taskAccountList.rotate(updatesPerCycle)
     print('Finished periodic update')
 
 @client.event
@@ -67,12 +69,12 @@ async def on_message(message):
             newTaskAccount = taskAccount(spreadsheetUrl, nickname, False)
             try:
                 sheet.updateTaskAccount(newTaskAccount)
-            except gspread.exceptions.APIError as e:
+                taskAccountList.updateLastUpdated(taskAccount, time())
+            except Exception as e:
                 print(e)
-                await message.channel.send('Error: e')
+                await message.channel.send(f'Error: {e}')
                 return
             taskAccountList.add(newTaskAccount)
-            taskAccountList.sort(reverse = True)
             await message.channel.send(f'Added account "{nickname}"')
         elif(command == 'addofficial'):
             if(len(result) < 3):
@@ -90,8 +92,9 @@ async def on_message(message):
             newTaskAccount = taskAccount(spreadsheetId, nickname, True)
             try:
                 sheet.updateTaskAccount(newTaskAccount)
-            except gspread.exceptions.APIError as e:
-                await message.channel.send('The spreadsheet provided has denied permission, make sure it is available for reading publicly')
+                taskAccountList.updateLastUpdated(taskAccount, time())
+            except Exception as e:
+                await message.channel.send(f'Error: {e}')
                 return
             taskAccountList.add(newTaskAccount)
             await message.channel.send(f'Added account "{nickname}"')
@@ -104,6 +107,7 @@ async def on_message(message):
                 await message.channel.send(f'There is no registered account with the nickname "{nickname}"!')
                 return
             sheet.updateTaskAccount(taskAccountToUpdate)
+            taskAccountList.updateLastUpdated(taskAccountToUpdate, time())
             await message.channel.send(f'Updated account "{nickname}"')
             await message.channel.send(taskAccountToUpdate.getAccountInfo())
 
