@@ -72,12 +72,11 @@ async def on_message(message):
             newTaskAccount = taskAccount(spreadsheetUrl, nickname, False)
             try:
                 sheet.updateTaskAccount(newTaskAccount)
-                taskAccountList.updateLastUpdated(taskAccount, time())
             except Exception as e:
-                print(e)
                 await message.channel.send(f'Error: {e}')
                 return
             taskAccountList.add(newTaskAccount)
+            taskAccountList.updateLastUpdated(taskAccount, time())
             await message.channel.send(f'Added account "{nickname}"')
         elif(command == 'addofficial'):
             if(len(result) < 3):
@@ -95,16 +94,18 @@ async def on_message(message):
             newTaskAccount = taskAccount(spreadsheetId, nickname, True)
             try:
                 sheet.updateTaskAccount(newTaskAccount)
-                taskAccountList.updateLastUpdated(taskAccount, time())
             except Exception as e:
                 await message.channel.send(f'Error: {e}')
                 return
             taskAccountList.add(newTaskAccount)
+            taskAccountList.updateLastUpdated(taskAccount, time())
             await message.channel.send(f'Added account "{nickname}"')
         elif(command == 'update'):
-            if(len(result) != 2):
+            if(len(result) < 2):
                 await message.channel.send('Error: You need to update accounts with the syntax !update [[nickname]]')
-            nickname = result[1].strip()
+            nickname = result[1]
+            for res in result[2:]:
+                nickname += ' ' + res
             taskAccountToUpdate = getTaskAccountFromNickname(nickname)
             if not taskAccountToUpdate:
                 await message.channel.send(f'There is no registered account with the nickname "{nickname}"!')
