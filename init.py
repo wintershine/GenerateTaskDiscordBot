@@ -28,12 +28,15 @@ async def updateTaskAccounts():
     updatesThisCycle = 0
     for taskAccount in taskAccountList.getOldestUpdatedAccounts(accountsToCheck):
         sheetLastUpdated = sheet.getSpreadsheetLastUpdatedTime(taskAccount.spreadsheetUrl)
-        if(sheetLastUpdated > taskAccount.lastUpdated and updatesThisCycle < maxUpdatesPerCycle):
+        if(sheetLastUpdated > taskAccount.lastUpdated):
             print(f'Updating {taskAccount.nickname}')
             sheet.updateTaskAccount(taskAccount)
             updatesThisCycle += 1
             await sleep(1)
         taskAccountList.updateLastUpdated(taskAccount, time())
+        if(updatesThisCycle == maxUpdatesPerCycle):
+            print('Finished periodic update')
+            return
         await sleep(1)
     print('Finished periodic update')
 
@@ -137,7 +140,7 @@ async def on_message(message):
                         Syntax: !addofficial [[spreadsheetUrl]] [[nickname]]. I recommend that you set your nickname as your RS name \
                         but it is not required'.replace("                        ",""))
                 elif(result[1] == 'update'):
-                    await message.channel.send('update" will force an update on the leaderboards for your account \n\
+                    await message.channel.send('"update" will force an update on the leaderboards for your account \n\
                         Syntax: !update [[nickname]]'.replace("                        ",""))
                 elif(result[1] == 'info'):
                     await message.channel.send('"info" will give you information about a specific task account \n\
@@ -158,4 +161,7 @@ def getTaskAccountFromNickname(nickname):
 discordBotToken = ''
 with open('discordbot_token.txt', 'r') as token:
     discordBotToken = token.read()
+
+for taskAccount in sheet.loadKnownTaskAccounts():
+    taskAccountList.add(taskAccount)
 client.run(discordBotToken)
