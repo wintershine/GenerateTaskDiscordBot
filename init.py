@@ -162,6 +162,6 @@ discordBotToken = ''
 with open('discordbot_token.txt', 'r') as token:
     discordBotToken = token.read()
 
-for taskAccount in sheet.loadKnownTaskAccounts():
-    taskAccountList.add(taskAccount)
+for taskAcc in sheet.loadKnownTaskAccounts():
+    taskAccountList.add(taskAcc)
 client.run(discordBotToken)
