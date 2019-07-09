@@ -10,9 +10,12 @@ class taskAccount(object):
     eliteProgress = 0
     masterProgress = 0
     godProgress = 0
-    lastUpdated = 0
     currentTask = 'Unknown'
     isOfficial = False
+
+    # In the taskAccountList, this parameter has to be modified through the updateLastUpdated method because
+    # it is used as the sorting key. Any other way of changing it might make it unretrievable from the list
+    lastUpdated = 0
 
     def __init__(self, spreadsheetUrl, nickname, isOfficial):
         self.spreadsheetUrl = spreadsheetUrl
@@ -28,8 +31,8 @@ class taskAccount(object):
     def formatTimeSinceUpdate(self):
         timeSinceLastUpdate = time() - self.lastUpdated
         seconds = round(timeSinceLastUpdate % 60, 2)
-        minutes = floor(timeSinceLastUpdate/60)
-        hours = floor(timeSinceLastUpdate/(60*60))
+        minutes = floor(timeSinceLastUpdate/60) % 60
+        hours = floor(timeSinceLastUpdate/(60*60)) % 24
         days = floor(timeSinceLastUpdate/(60*60*24))
 
         return f'{days} days {hours} hours {minutes} minutes {seconds} seconds'

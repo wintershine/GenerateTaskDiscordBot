@@ -1,19 +1,46 @@
 import discord
-import bisect
-import gspread.exceptions
+from time import time
+from asyncio import sleep
+from discord.ext import tasks
 
-from gsheet import *
+import gsheet
 from taskAccount import *
+from taskAccountList import taskAccountList
 
 client = discord.Client()
-sheet = gsheet()
+sheet = gsheet.gsheet()
 
-taskAccounts = []
+maxChecksPerCycle = 50
+maxUpdatesPerCycle = 10
+taskAccountList = taskAccountList()
+
+@tasks.loop(minutes=2)
+async def updateTaskAccounts():
+    taskAccounts = taskAccountList.taskAccounts
+    print('Starting periodic update...')
+    accountsToCheck = maxChecksPerCycle
+    if(len(taskAccounts) == 0):
+        print('Finished periodic update')
+        return
+    elif(len(taskAccounts) < accountsToCheck):
+        accountsToCheck = len(taskAccounts)
+
+    updatesThisCycle = 0
+    for taskAccount in taskAccountList.getOldestUpdatedAccounts(accountsToCheck):
+        sheetLastUpdated = sheet.getSpreadsheetLastUpdatedTime(taskAccount.spreadsheetUrl)
+        if(sheetLastUpdated > taskAccount.lastUpdated and updatesThisCycle < maxUpdatesPerCycle):
+            print(f'Updating {taskAccount.nickname}')
+            sheet.updateTaskAccount(taskAccount)
+            updatesThisCycle += 1
+            await sleep(1)
+        taskAccountList.updateLastUpdated(taskAccount, time())
+        await sleep(1)
+    print('Finished periodic update')
 
 @client.event
 async def on_ready():
-    print('Updating and loading all known task accounts')
-
+    if(not updateTaskAccounts.get_task()):
+        updateTaskAccounts.start()
 
 @client.event
 async def on_message(message):
@@ -24,13 +51,13 @@ async def on_message(message):
     if message.content.startswith('!'):
         msg = message.content[1:]
         result = [x.strip() for x in msg.split(' ')]
-        command = result[0].strip()
+        command = result[0]
 
         if(command == 'add'):
             if(len(result) < 3):
                 await message.channel.send('Error: You need to add accounts with the syntax !add [[spreadsheetUrl]] [[nickname]]')
                 return
-            spreadsheetUrl = result[1].strip()
+            spreadsheetUrl = result[1]
             nickname = result[2]
             for res in result[3:]:
                 nickname += ' ' + res
@@ -42,10 +69,12 @@ async def on_message(message):
             newTaskAccount = taskAccount(spreadsheetUrl, nickname, False)
             try:
                 sheet.updateTaskAccount(newTaskAccount)
-            except gspread.exceptions.APIError:
-                await message.channel.send('The spreadsheet provided has denied permission, make sure it is available for reading publicly')
+                taskAccountList.updateLastUpdated(taskAccount, time())
+            except Exception as e:
+                print(e)
+                await message.channel.send(f'Error: {e}')
                 return
-            taskAccounts.append(newTaskAccount)
+            taskAccountList.add(newTaskAccount)
             await message.channel.send(f'Added account "{nickname}"')
         elif(command == 'addofficial'):
             if(len(result) < 3):
@@ -63,10 +92,11 @@ async def on_message(message):
             newTaskAccount = taskAccount(spreadsheetId, nickname, True)
             try:
                 sheet.updateTaskAccount(newTaskAccount)
-            except gspread.exceptions.APIError as e:
-                await message.channel.send('The spreadsheet provided has denied permission, make sure it is available for reading publicly')
+                taskAccountList.updateLastUpdated(taskAccount, time())
+            except Exception as e:
+                await message.channel.send(f'Error: {e}')
                 return
-            taskAccounts.append(newTaskAccount)
+            taskAccountList.add(newTaskAccount)
             await message.channel.send(f'Added account "{nickname}"')
         elif(command == 'update'):
             if(len(result) != 2):
@@ -77,6 +107,7 @@ async def on_message(message):
                 await message.channel.send(f'There is no registered account with the nickname "{nickname}"!')
                 return
             sheet.updateTaskAccount(taskAccountToUpdate)
+            taskAccountList.updateLastUpdated(taskAccountToUpdate, time())
             await message.channel.send(f'Updated account "{nickname}"')
             await message.channel.send(taskAccountToUpdate.getAccountInfo())
 
@@ -118,7 +149,7 @@ async def on_message(message):
                 await(message.channel.send('Unrecognized help command'))
 
 def getTaskAccountFromNickname(nickname):
-    for taskAccount in taskAccounts:
+    for taskAccount in taskAccountList.taskAccounts:
         if(taskAccount.nickname == nickname):
             return taskAccount
 
