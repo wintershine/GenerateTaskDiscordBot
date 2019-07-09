@@ -10,16 +10,46 @@ from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 from googleapiclient.discovery import build
 
+from taskAccount import taskAccount
+
 class gsheet(object):
     LEADERBOARDS_ID = '1Pb4p4qFPaJ2nA7ABwxVzazF2pYDiIVpoGHH-BolKtJY'
 
-    def getKnownTaskAccounts(self):
-        scope = ['https://spreadsheets.google.com/feeds',
+    def loadKnownTaskAccounts(self):
+        try:
+            scope = ['https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive']
-        creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
-        gsclient = gspread.authorize(creds)
-        sheet = gsclient.open_by_key(self.LEADERBOARDS_ID)
-        worksheet = sheet.worksheet("RawData")
+            creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
+
+            service = build('sheets', 'v4', credentials=creds)
+            sheet = service.spreadsheets()
+
+            range_name = 'RawData!A2:K'
+
+            result = sheet.values().get(
+                spreadsheetId = self.LEADERBOARDS_ID,
+                range=range_name).execute()
+            
+            taskAccounts = []
+            for account in result.get('values'):
+                spreadsheetUrl = account[8]
+                nickname = account[0]
+                isOfficial = account[7] == 'True' or account[7] == 'TRUE'
+
+                newTaskAccount = taskAccount(spreadsheetUrl, nickname, isOfficial)
+                newTaskAccount.easyProgress = int(account[1])
+                newTaskAccount.mediumProgress = int(account[2])
+                newTaskAccount.hardProgress = int(account[3])
+                newTaskAccount.eliteProgress = int(account[4])
+                newTaskAccount.masterProgress = int(account[5])
+                newTaskAccount.godProgress = int(account[6])
+                newTaskAccount.lastUpdated = float(account[9])
+                newTaskAccount.currentTask = account[10]
+
+                taskAccounts.append(newTaskAccount)
+
+            return taskAccounts
+        except Exception: raise
 
     def updateTaskAccount(self, taskAccount):
         try:
@@ -31,36 +61,42 @@ class gsheet(object):
             sheet = service.spreadsheets()
 
             range_names = [
-                'Easy!C2:C',
-                'Medium!C2:C',
-                'Hard!C2:C',
-                'Elite!C2:C',
-                'Master!C2:C',
-                'God!C2:C',
+                'Easy!A2:C',
+                'Medium!A2:C',
+                'Hard!A2:C',
+                'Elite!A2:C',
+                'Master!A2:C',
+                'God!A2:C',
                 'DASHBOARD!B15'
             ]
 
             result = sheet.values().batchGet(
                 spreadsheetId = self.getIdFromUrl(taskAccount.spreadsheetUrl),
-                ranges=range_names).execute()
+                ranges = range_names,
+                valueRenderOption = 'FORMATTED_VALUE').execute()
 
-            i = 0
-            difficultyCompletions = [[],[],[],[],[],[],[]]
-            for range in result.get('valueRanges', []):
-                difficultyCompletions[i] = range.get('values')
-                i+=1
+            difficultyCompletions = []
+            for range in result.get('valueRanges'):
+                compl = []
+                if(range.get('range') == 'DASHBOARD!B15'):
+                    difficultyCompletions.append(range.get('values')[0][0])
+                else:
+                    for x in range.get('values'):
+                        if(len(x) < 3):
+                            compl.append('')
+                        else:
+                            compl.append(x[2])
+                    difficultyCompletions.append(compl)
 
-            i = 0
-            difficultyTotals = [0,0,0,0,0,0]
-            for difficultyCompletion in difficultyCompletions[:len(difficultyCompletions) - 2]:
+            difficultyTotals = []
+            for difficultyCompletion in difficultyCompletions[:len(difficultyCompletions) - 1]:
                 count = 0
                 for taskCompletion in difficultyCompletion:
                     if(len(taskCompletion) != 0):
                         count+=1
-                difficultyTotals[i] = count
-                i+=1
-            if(len(difficultyCompletions[0][6]) != 0):
-                currentTask = difficultyCompletions[len(difficultyCompletions)-1][0][0]
+                difficultyTotals.append(count)
+            if(len(difficultyCompletions[len(difficultyCompletions)-1]) != 0):
+                currentTask = difficultyCompletions[len(difficultyCompletions)-1]
             else:
                 currentTask = 'None'
 
@@ -92,7 +128,9 @@ class gsheet(object):
             taskAccount.masterProgress,
             taskAccount.godProgress,
             taskAccount.isOfficial,
-            taskAccount.spreadsheetUrl
+            taskAccount.spreadsheetUrl,
+            taskAccount.lastUpdated,
+            taskAccount.currentTask
         ]
 
         existingAccounts = worksheet.col_values(1)
@@ -100,7 +138,7 @@ class gsheet(object):
         for nickname in existingAccounts:
             if (nickname == taskAccount.nickname):
                 index = existingAccounts.index(nickname) + 1
-                cell_list = worksheet.range(f'A{index}:I{index}')
+                cell_list = worksheet.range(f'A{index}:K{index}')
 
                 i = 0
                 for cell in cell_list:

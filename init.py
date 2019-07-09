@@ -28,12 +28,15 @@ async def updateTaskAccounts():
     updatesThisCycle = 0
     for taskAccount in taskAccountList.getOldestUpdatedAccounts(accountsToCheck):
         sheetLastUpdated = sheet.getSpreadsheetLastUpdatedTime(taskAccount.spreadsheetUrl)
-        if(sheetLastUpdated > taskAccount.lastUpdated and updatesThisCycle < maxUpdatesPerCycle):
+        if(sheetLastUpdated > taskAccount.lastUpdated):
             print(f'Updating {taskAccount.nickname}')
             sheet.updateTaskAccount(taskAccount)
             updatesThisCycle += 1
             await sleep(1)
         taskAccountList.updateLastUpdated(taskAccount, time())
+        if(updatesThisCycle == maxUpdatesPerCycle):
+            print('Finished periodic update')
+            return
         await sleep(1)
     print('Finished periodic update')
 
@@ -69,12 +72,11 @@ async def on_message(message):
             newTaskAccount = taskAccount(spreadsheetUrl, nickname, False)
             try:
                 sheet.updateTaskAccount(newTaskAccount)
-                taskAccountList.updateLastUpdated(taskAccount, time())
             except Exception as e:
-                print(e)
                 await message.channel.send(f'Error: {e}')
                 return
             taskAccountList.add(newTaskAccount)
+            taskAccountList.updateLastUpdated(taskAccount, time())
             await message.channel.send(f'Added account "{nickname}"')
         elif(command == 'addofficial'):
             if(len(result) < 3):
@@ -92,16 +94,18 @@ async def on_message(message):
             newTaskAccount = taskAccount(spreadsheetId, nickname, True)
             try:
                 sheet.updateTaskAccount(newTaskAccount)
-                taskAccountList.updateLastUpdated(taskAccount, time())
             except Exception as e:
                 await message.channel.send(f'Error: {e}')
                 return
             taskAccountList.add(newTaskAccount)
+            taskAccountList.updateLastUpdated(taskAccount, time())
             await message.channel.send(f'Added account "{nickname}"')
         elif(command == 'update'):
-            if(len(result) != 2):
+            if(len(result) < 2):
                 await message.channel.send('Error: You need to update accounts with the syntax !update [[nickname]]')
-            nickname = result[1].strip()
+            nickname = result[1]
+            for res in result[2:]:
+                nickname += ' ' + res
             taskAccountToUpdate = getTaskAccountFromNickname(nickname)
             if not taskAccountToUpdate:
                 await message.channel.send(f'There is no registered account with the nickname "{nickname}"!')
@@ -137,7 +141,7 @@ async def on_message(message):
                         Syntax: !addofficial [[spreadsheetUrl]] [[nickname]]. I recommend that you set your nickname as your RS name \
                         but it is not required'.replace("                        ",""))
                 elif(result[1] == 'update'):
-                    await message.channel.send('update" will force an update on the leaderboards for your account \n\
+                    await message.channel.send('"update" will force an update on the leaderboards for your account \n\
                         Syntax: !update [[nickname]]'.replace("                        ",""))
                 elif(result[1] == 'info'):
                     await message.channel.send('"info" will give you information about a specific task account \n\
@@ -158,4 +162,7 @@ def getTaskAccountFromNickname(nickname):
 discordBotToken = ''
 with open('discordbot_token.txt', 'r') as token:
     discordBotToken = token.read()
+
+for taskAcc in sheet.loadKnownTaskAccounts():
+    taskAccountList.add(taskAcc)
 client.run(discordBotToken)
