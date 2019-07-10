@@ -99,7 +99,7 @@ async def on_message(message):
             await message.channel.send(f'Error: {e}')
             return
         taskAccountList.add(newTaskAccount)
-        taskAccountList.updateLastUpdated(taskAccount, time())
+        taskAccountList.updateLastUpdated(newTaskAccount, time())
         await message.channel.send(f'Added account "{nickname}"')
     elif(command == 'update'):
         if(len(result) < 2):
