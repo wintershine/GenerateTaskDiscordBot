@@ -8,7 +8,7 @@ from taskAccount import *
 from taskAccountList import taskAccountList
 
 client = discord.Client()
-channelName = 'bot-command
+channelName = 'bot-command'
 
 sheet = gsheet.gsheet()
 
