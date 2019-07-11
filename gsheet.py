@@ -165,5 +165,4 @@ class gsheet(object):
         return ts
 
     def getIdFromUrl(self, url):
-        untrimmed = re.search('/[-\w]{25,}/', url).group()
-        return untrimmed[1:len(untrimmed)-1]
+        return re.search('\/d\/(.*?)(\/|$)', url).group(1)
