@@ -16,7 +16,6 @@ maxChecksPerCycle = 50
 maxUpdatesPerCycle = 10
 taskAccountList = taskAccountList()
 
-
 @tasks.loop(minutes=2)
 async def updateTaskAccounts():
     taskAccounts = taskAccountList.taskAccounts
@@ -43,12 +42,10 @@ async def updateTaskAccounts():
         await sleep(1)
     print('Finished periodic update')
 
-
 @client.event
 async def on_ready():
     if(not updateTaskAccounts.get_task()):
         updateTaskAccounts.start()
-
 
 @client.event
 async def on_message(message):
@@ -60,22 +57,22 @@ async def on_message(message):
     command = result[0]
 
     if(command == 'add'):
-        add(result, False)
+        await add(result, False, message)
     
     elif(command == 'addofficial'):
-        add(result, True)
+        await add(result, True, message)
         
     elif(command == 'update'):
-        update(result)
+        await update(result, message)
 
     elif(command == 'info'):
-        info(result)
+        await info(result, message)
         
     elif(command == 'leaderboard' or command == 'leaderboards'):
-       leaderboard()
+       await leaderboard(message)
 
     elif (command == 'help' or command == 'h' or command == 'commands' or command == 'options'):
-        help(result)
+        await help(result, message)
 
 def getTaskAccountFromNickname(nickname):
     for taskAccount in taskAccountList.taskAccounts:
@@ -84,84 +81,81 @@ def getTaskAccountFromNickname(nickname):
     return None
 
 # botCommands Functions
-async def add(result, isOfficial):
+async def add(result, isOfficial, message):
     if(len(result) < 3):
-            await message.channel.send('Error: You need to add accounts with the syntax !add [[spreadsheetUrl]] [[nickname]]')
-            return
-        spreadsheetUrl = result[1]
-        nickname = result[2]
-        for res in result[3:]:
-            nickname += ' ' + res
-        
-        if(getTaskAccountFromNickname(nickname)):
-            await message.channel.send(f'Account {nickname} already exists')
-            return
-
-        if (isOfficial):
-            newTaskAccount = taskAccount(spreadsheetUrl, nickname, True)
-        else
-            newTaskAccount = taskAccount(spreadsheetUrl, nickname, False)
-
-        try:
-            sheet.updateTaskAccount(newTaskAccount)
-        except Exception as e:
-            await message.channel.send(f'Error: {e}')
-            return
-        taskAccountList.add(newTaskAccount)
-        taskAccountList.updateLastUpdated(newTaskAccount, time())
-        await message.channel.send(f'Added account "{nickname}"')
-
-async def update(result):
-    if(len(result) < 2):
-            await message.channel.send('Error: You need to update accounts with the syntax !update [[nickname]]')
-        nickname = result[1]
-        for res in result[2:]:
-            nickname += ' ' + res
-        taskAccountToUpdate = getTaskAccountFromNickname(nickname)
-        if not taskAccountToUpdate:
-            await message.channel.send(f'There is no registered account with the nickname "{nickname}"!')
-            return
-        sheet.updateTaskAccount(taskAccountToUpdate)
-        taskAccountList.updateLastUpdated(taskAccountToUpdate, time())
-        await message.channel.send(f'Updated account "{nickname}"')
-        await message.channel.send(taskAccountToUpdate.getAccountInfo())
-
-async def info(result):
-     nickname = result[1]
-        for res in result[2:]:
-            nickname += ' ' + res
-        taskAccountToGetInfoFrom = getTaskAccountFromNickname(nickname)
-        if not taskAccountToGetInfoFrom:
-            await message.channel.send(f'There is no registered account with the nickname "{nickname}"!')
-            return
-        await message.channel.send(taskAccountToGetInfoFrom.getAccountInfo())
+        await message.channel.send('Error: You need to add accounts with the syntax !add [[spreadsheetUrl]] [[nickname]]')
+        return
+    spreadsheetUrl = result[1]
+    nickname = result[2]
+    for res in result[3:]:
+        nickname += ' ' + res
     
-async def leaderboard():
+    if(getTaskAccountFromNickname(nickname)):
+        await message.channel.send(f'Account {nickname} already exists')
+        return
+
+    newTaskAccount = taskAccount(spreadsheetUrl, nickname, isOfficial)
+   
+    try:
+        sheet.updateTaskAccount(newTaskAccount)
+    except Exception as e:
+        await message.channel.send(f'Error: {e}')
+        return
+    taskAccountList.add(newTaskAccount)
+    taskAccountList.updateLastUpdated(newTaskAccount, time())
+    await message.channel.send(f'Added account "{nickname}"')
+
+async def update(result, message):
+    if(len(result) < 2):
+        await message.channel.send('Error: You need to update accounts with the syntax !update [[nickname]]')
+    nickname = result[1]
+    for res in result[2:]:
+        nickname += ' ' + res
+    taskAccountToUpdate = getTaskAccountFromNickname(nickname)
+    if not taskAccountToUpdate:
+        await message.channel.send(f'There is no registered account with the nickname "{nickname}"!')
+        return
+    sheet.updateTaskAccount(taskAccountToUpdate)
+    taskAccountList.updateLastUpdated(taskAccountToUpdate, time())
+    await message.channel.send(f'Updated account "{nickname}"')
+    await message.channel.send(taskAccountToUpdate.getAccountInfo())
+
+async def info(result, message):
+    nickname = result[1]
+    for res in result[2:]:
+        nickname += ' ' + res
+    taskAccountToGetInfoFrom = getTaskAccountFromNickname(nickname)
+    if not taskAccountToGetInfoFrom:
+        await message.channel.send(f'There is no registered account with the nickname "{nickname}"!')
+        return
+    await message.channel.send(taskAccountToGetInfoFrom.getAccountInfo())
+    
+async def leaderboard(message):
      await message.channel.send('The leaderboards can be found at https://docs.google.com/spreadsheets/d/1Pb4p4qFPaJ2nA7ABwxVzazF2pYDiIVpoGHH-BolKtJY')
         
-async def help(result)
+async def help(result,message):
     if(len(result) == 1):
             await message.channel.send('Available commands: !add, !addofficial !update, !info, !leaderboards, !help,')
-        elif(len(result) == 2):
-            if(result[1] == 'add'):
-                await message.channel.send('"add" allows you to add your account to the leaderboards! \n\
-                    Syntax: !add [[spreadsheetUrl]] [[nickname]]. I recommend that you set your nickname as your RS name \
-                    but it is not required'.replace("                        ",""))
-            elif(result[1] == 'addofficial'):
-                await message.channel.send('"addofficial" allows you to add your official taskaccount to the leaderboards! \n\
-                    Syntax: !addofficial [[spreadsheetUrl]] [[nickname]]. I recommend that you set your nickname as your RS name \
-                    but it is not required'.replace("                        ",""))
-            elif(result[1] == 'update'):
-                await message.channel.send('"update" will force an update on the leaderboards for your account \n\
-                    Syntax: !update [[nickname]]'.replace("                        ",""))
-            elif(result[1] == 'info'):
-                await message.channel.send('"info" will give you information about a specific task account \n\
-                    Syntax: !info [[nickname]]'.replace("                        ",""))
-            elif(result[1] == 'leaderboards'):
-                await message.channel.send('"leaderboards" will provide a link to the leaderboards \n\
-                    Syntax: !info [[nickname]]'.replace("                        ",""))
-        else:
-            await(message.channel.send('Unrecognized help command'))
+    elif(len(result) == 2):
+        if(result[1] == 'add'):
+            await message.channel.send('"add" allows you to add your account to the leaderboards! \n\
+                Syntax: !add [[spreadsheetUrl]] [[nickname]]. I recommend that you set your nickname as your RS name \
+                but it is not required'.replace("                        ",""))
+        elif(result[1] == 'addofficial'):
+            await message.channel.send('"addofficial" allows you to add your official taskaccount to the leaderboards! \n\
+                Syntax: !addofficial [[spreadsheetUrl]] [[nickname]]. I recommend that you set your nickname as your RS name \
+                but it is not required'.replace("                        ",""))
+        elif(result[1] == 'update'):
+            await message.channel.send('"update" will force an update on the leaderboards for your account \n\
+                Syntax: !update [[nickname]]'.replace("                        ",""))
+        elif(result[1] == 'info'):
+            await message.channel.send('"info" will give you information about a specific task account \n\
+                Syntax: !info [[nickname]]'.replace("                        ",""))
+        elif(result[1] == 'leaderboards'):
+            await message.channel.send('"leaderboards" will provide a link to the leaderboards \n\
+                Syntax: !info [[nickname]]'.replace("                        ",""))
+    else:
+        await(message.channel.send('Unrecognized help command'))
 
 discordBotToken = ''
 with open('discordbot_token.txt', 'r') as token:
