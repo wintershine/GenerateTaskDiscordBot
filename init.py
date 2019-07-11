@@ -117,6 +117,8 @@ async def on_message(message):
         await message.channel.send(taskAccountToUpdate.getAccountInfo())
 
     elif(command == 'info'):
+        if(len(result) < 1):
+            await message.channel.send(f'You need to give the account to pull information from')
         nickname = result[1]
         for res in result[2:]:
             nickname += ' ' + res
