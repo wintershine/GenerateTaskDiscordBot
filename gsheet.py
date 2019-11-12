@@ -44,7 +44,10 @@ class gsheet(object):
                 newTaskAccount.masterProgress = int(account[5])
                 newTaskAccount.godProgress = int(account[6])
                 newTaskAccount.lastUpdated = float(account[9])
-                newTaskAccount.currentTask = account[10]
+                if (account[10]):
+                    newTaskAccount.currentTask = account[10]
+                else:
+                    newTaskAccount.currentTask = "None"
 
                 taskAccounts.append(newTaskAccount)
 
@@ -79,7 +82,10 @@ class gsheet(object):
             for range in result.get('valueRanges'):
                 compl = []
                 if(range.get('range') == 'DASHBOARD!B15'):
-                    difficultyCompletions.append(range.get('values')[0][0])
+                    if (len(range.get('values')[0]) != 0):
+                        difficultyCompletions.append(range.get('values')[0][0])
+                    else:
+                        difficultyCompletions.append('None')
                 else:
                     for x in range.get('values'):
                         if(len(x) < 3):
@@ -95,10 +101,8 @@ class gsheet(object):
                     if(len(taskCompletion) != 0):
                         count+=1
                 difficultyTotals.append(count)
-            if(len(difficultyCompletions[len(difficultyCompletions)-1]) != 0):
-                currentTask = difficultyCompletions[len(difficultyCompletions)-1]
-            else:
-                currentTask = 'None'
+
+            currentTask = difficultyCompletions[len(difficultyCompletions)-1]
 
             taskAccount.easyProgress = int(difficultyTotals[0])
             taskAccount.mediumProgress = int(difficultyTotals[1])
@@ -109,7 +113,8 @@ class gsheet(object):
             taskAccount.currentTask = currentTask
 
             self.updateLeaderboards(taskAccount)
-        except Exception: raise
+        except Exception as e:
+            print(e)
 
     def updateLeaderboards(self, taskAccount):
         scope = ['https://spreadsheets.google.com/feeds',
@@ -157,12 +162,12 @@ class gsheet(object):
         service = build('drive', 'v3', credentials=creds)
         try:
             result = service.files().get(fileId=self.getIdFromUrl(spreadsheetUrl), fields='modifiedTime').execute()
-        except Exception as e:
-            print(e)
-        unformatted = result.get('modifiedTime')
-        # fromisoformat does not support the letter timezone notation
-        ts = datetime.fromisoformat(unformatted.replace("Z", "+00:00")).timestamp()
-        return ts
 
+            unformatted = result.get('modifiedTime')
+            # fromisoformat does not support the letter timezone notation
+            ts = datetime.fromisoformat(unformatted.replace("Z", "+00:00")).timestamp()
+            return ts
+        except Exception as e:
+            return 0
     def getIdFromUrl(self, url):
         return re.search('\/d\/(.*?)(\/|$)', url).group(1)
