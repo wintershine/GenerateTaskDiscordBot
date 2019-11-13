@@ -2,6 +2,7 @@ import discord
 from time import time
 from asyncio import sleep
 from discord.ext import tasks
+import googleapiclient.errors
 
 import gsheet
 from taskAccount import *
@@ -65,6 +66,9 @@ async def on_message(message):
     elif(command == 'update'):
         await update(result, message)
 
+    elif(command == 'latest'):
+        await latest(result, message)
+
     elif(command == 'info'):
         await info(result, message)
         
@@ -98,12 +102,18 @@ async def add(result, isOfficial, message):
    
     try:
         sheet.updateTaskAccount(newTaskAccount)
-    except Exception as e:
-        await message.channel.send(f'Error: {e}')
-        return
-    taskAccountList.add(newTaskAccount)
-    taskAccountList.updateLastUpdated(newTaskAccount, time())
-    await message.channel.send(f'Added account "{nickname}"')
+        taskAccountList.add(newTaskAccount)
+        taskAccountList.updateLastUpdated(newTaskAccount, time())
+        await message.channel.send(f'Added account "{nickname}"')
+    except googleapiclient.errors.HttpError as err:
+        if '403' in str(err.content):
+            msg = 'The bot does not have viewing rights to your sheet. Please make your sheet visible to the public or give view rights to '
+            msg = msg + '"generatetaskleaderboards@quickstart-1561791519322.iam.gserviceaccount.com"'
+            await message.channel.send(msg)
+        else:
+            await message.channel.send('An error happened while adding your sheet, try again later')
+            print(err)
+    
 
 async def update(result, message):
     if(len(result) < 2):
@@ -119,6 +129,33 @@ async def update(result, message):
     taskAccountList.updateLastUpdated(taskAccountToUpdate, time())
     await message.channel.send(f'Updated account "{nickname}"')
     await message.channel.send(taskAccountToUpdate.getAccountInfo())
+
+async def latest(result, message):
+    try:
+        if(len(result) < 2):
+            await message.channel.send('Error: You need to update to the latest version with the syntax !latest [[nickname]]')
+        nickname = result[1]
+        for res in result[2:]:
+            nickname += ' ' + res
+        taskAccountToUpdate = getTaskAccountFromNickname(nickname)
+        if not taskAccountToUpdate:
+            await message.channel.send(f'There is no registered account with the nickname "{nickname}"!')
+            return
+        remainingTasks = sheet.updateSpreadsheetToLatestVersion(taskAccountToUpdate.spreadsheetUrl)
+
+        await message.channel.send('Your sheet was updated to the latest version!')
+        if(remainingTasks):
+            remainingTasksWarning = 'These tasks could not be filled into the new sheet. This means they got changed, renamed or removed:\n'
+            for remainingTask, count in remainingTasks.items():
+                remainingTasksWarning = remainingTasksWarning + f'{remainingTask} - {count} time(s)\n' 
+            await message.channel.send(remainingTasksWarning)
+            remainingTasksWarning = remainingTasksWarning + 'You will have to manually fill them in if applicable'
+        await message.channel.send('Remember that if there were changes to the tier you are currently on, it is possible you might have to change the hidden "info" tab')
+    except googleapiclient.errors.HttpError as err:
+        if '403' in str(err.content):
+            msg = 'The bot does not have edit rights to your sheet. Please give edit rights to "generatetaskleaderboards@quickstart-1561791519322.iam.gserviceaccount.com" '
+            msg = msg + 'if you want it to update your sheet to the latest version.'
+            await message.channel.send(msg)
 
 async def info(result, message):
     nickname = result[1]
