@@ -15,6 +15,16 @@ from taskAccount import taskAccount
 class gsheet(object):
     LEADERBOARDS_ID = '1Pb4p4qFPaJ2nA7ABwxVzazF2pYDiIVpoGHH-BolKtJY'
 
+    BLANK_SHEET_ID = '1YJK_ZS66u_R48gJmsRQ2Qt-wxki7Nr3Dn9g8qLLQadU'
+    DASHBOARD_ID = 892013748
+    EASY_ID = 329575153
+    MEDIUM_ID = 1727754730
+    HARD_ID = 609485244
+    ELITE_ID = 515954571
+    MASTER_ID = 779677934
+    GOD_ID = 1066915788
+    PASSIVE_ID = 334976592
+
     def loadKnownTaskAccounts(self):
         try:
             scope = ['https://spreadsheets.google.com/feeds',
@@ -115,6 +125,7 @@ class gsheet(object):
             self.updateLeaderboards(taskAccount)
         except Exception as e:
             print(e)
+            raise
 
     def updateLeaderboards(self, taskAccount):
         scope = ['https://spreadsheets.google.com/feeds',
@@ -154,6 +165,220 @@ class gsheet(object):
         
         #Add new row if the account was not on leaderboards yet
         worksheet.append_row(values)
+
+    def updateSpreadsheetToLatestVersion(self, spreadsheetUrl):
+        try:
+            scope = ['https://spreadsheets.google.com/feeds',
+            'https://www.googleapis.com/auth/drive']
+            creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
+
+            service = build('sheets', 'v4', credentials=creds)
+            sheet = service.spreadsheets()
+
+            spreadsheetId = self.getIdFromUrl(spreadsheetUrl)
+            infoTabId = 0
+
+            # Get all task completions
+            range_names = [
+                'Easy!A2:C',
+                'Medium!A2:C',
+                'Hard!A2:C',
+                'Elite!A2:C',
+                'Master!A2:C',
+                'God!A2:C',
+                'Passive!A2:C',
+            ]
+
+            completionsResult = sheet.values().batchGet(
+                spreadsheetId = spreadsheetId,
+                ranges = range_names,
+                valueRenderOption = 'FORMATTED_VALUE').execute()
+
+            completedTaskDictionary = {}
+            for range in completionsResult.get('valueRanges'):
+                for x in range.get('values'):
+                    if (len(x) >= 3):
+                        if x[0] in completedTaskDictionary:
+                            completedTaskDictionary[x[0]] = completedTaskDictionary[x[0]] + 1
+                        else:
+                            completedTaskDictionary[x[0]] = 1
+
+            # Get sheet IDs to delete
+            res = sheet.get(spreadsheetId=spreadsheetId).execute()
+            sheet_ids = []
+            for sh in res.get('sheets'):
+                if(sh.get('properties').get('title') == 'Info'):
+                    infoTabId = sh.get('properties').get('sheetId')
+                elif(sh.get('properties').get('title') != 'DASHBOARD'):
+                    sheet_ids.append(sh.get('properties').get('sheetId'))
+
+            sheet_delete_requests = []
+            for sheet_id in sheet_ids:
+                sheet_delete_requests.append({
+                    'deleteSheet': {
+                        'sheetId': sheet_id
+                    }
+                })
+
+            # Delete old sheets
+            delete_sheets_body = {
+                'requests': sheet_delete_requests
+            }
+
+            sheet.batchUpdate(spreadsheetId=spreadsheetId,body=delete_sheets_body).execute()
+
+            # Copy new sheets
+            source_sheet_ids = [
+                self.EASY_ID,
+                self.MEDIUM_ID,
+                self.HARD_ID,
+                self.ELITE_ID,
+                self.MASTER_ID,
+                self.GOD_ID,
+                self.PASSIVE_ID,
+            ]
+            sheet_names = ['Easy', 'Medium', 'Hard', 'Elite', 'Master', 'God', 'Passive']
+
+            copy_sheet_to_another_spreadsheet_request_body = {
+                'destination_spreadsheet_id': spreadsheetId,
+            }
+
+            updated_sheet_ids = []
+            for source_sheet_id in source_sheet_ids:
+                res = sheet.sheets().copyTo(spreadsheetId=self.BLANK_SHEET_ID, sheetId=source_sheet_id, body=copy_sheet_to_another_spreadsheet_request_body).execute()
+
+                updated_sheet_ids.append(res.get('sheetId'))
+            
+            # Rename new sheets
+            sheet_rename_requests = []
+            i = 0
+            for sheet_name in sheet_names:
+                sheet_rename_requests.append({
+                    'updateSheetProperties': {
+                        'properties': {
+                            'title': sheet_name,
+                            'sheetId': updated_sheet_ids[i],
+                        },
+                        'fields': 'title'
+                    }
+                })
+                i = i+1
+
+            rename_sheets_body = {
+                'requests': sheet_rename_requests
+            }
+            sheet.batchUpdate(spreadsheetId=spreadsheetId, body=rename_sheets_body).execute()
+
+
+            # Restore task completions
+            taskNames_range_names = [
+                'Easy!A2:A',
+                'Medium!A2:A',
+                'Hard!A2:A',
+                'Elite!A2:A',
+                'Master!A2:A',
+                'God!A2:A',
+                'Passive!A2:A'
+            ]
+
+            taskNamesResult = sheet.values().batchGet(
+                spreadsheetId = spreadsheetId,
+                ranges = taskNames_range_names,
+                valueRenderOption = 'FORMATTED_VALUE').execute()
+
+            update_cells_requests = []
+
+            i = 0
+            for range in taskNamesResult.get('valueRanges'):
+                rows = []
+                for x in range.get('values'):
+                    if (x[0] in completedTaskDictionary):
+                        # need to append RowData objects, not just a string
+                        rows.append({
+                            'values': [{
+                                'userEnteredValue': {
+                                    'stringValue': 'x' 
+                                },
+                            }]
+                        })
+                        if(completedTaskDictionary[x[0]] < 2):
+                            completedTaskDictionary.pop(x[0])
+                        else:
+                            completedTaskDictionary[x[0]] = completedTaskDictionary[x[0]] - 1
+                    else:
+                        rows.append({
+                            'values': [{
+                                'userEnteredValue': {},
+                            }]
+                        })
+
+                update_cells_requests.append({
+                    'updateCells': {
+                        'rows': rows,
+                        'fields': 'userEnteredValue',
+                        'range': {
+                            'sheetId': updated_sheet_ids[i],
+                            'startColumnIndex': 2,
+                            'endColumnIndex': 3,
+                            'startRowIndex': 1,
+                        }
+                    }
+                })
+                i = i + 1
+
+            update_cells_body = {
+                'requests': update_cells_requests
+            }
+
+            sheet.batchUpdate(spreadsheetId=spreadsheetId, body=update_cells_body).execute()
+            
+            # Force google to update function results. Google seems to think there was no change when it is done through the API
+            # so function results are not always updated. This break the info tab and therefore the dashboard.
+            # We simply rewrite the exact same functions into the info tab.
+            info_functions = [
+                '=COUNTA(Easy!B:B)-1', '=COUNTA(Easy!C:C)-1', '',
+                '=COUNTA(Medium!B:B)-1', '=COUNTA(Medium!C:C)-1', '',
+                '=COUNTA(Hard!B:B)-1', '=COUNTA(Hard!C:C)-1', '',
+                '=COUNTA(Elite!B:B)-1', '=COUNTA(Elite!C:C)-1',
+            ]
+
+            update_functions_rows = []
+            for info_function in info_functions:
+                if(info_function == ''):
+                    update_functions_rows.append({
+                        'values': [{
+                            'userEnteredValue': {},
+                        }]
+                    })            
+                else:
+                    update_functions_rows.append({
+                        'values': [{
+                            'userEnteredValue': {
+                                'formulaValue': info_function
+                            },
+                        }]
+                    })
+
+            refresh_functions_body = {
+                'requests': [{
+                    'updateCells': {
+                        'rows': update_functions_rows,
+                        'fields': 'userEnteredValue',
+                        'range': {
+                            'sheetId': infoTabId,
+                            'startColumnIndex': 1,
+                            'endColumnIndex': 2,
+                            'startRowIndex': 0,
+                            'endRowIndex': 11
+                    }
+                }
+                }]
+            }
+
+            sheet.batchUpdate(spreadsheetId=spreadsheetId, body=refresh_functions_body).execute()
+            
+            return completedTaskDictionary
+        except Exception: raise
 
     def getSpreadsheetLastUpdatedTime(self, spreadsheetUrl):
         scope = ['https://spreadsheets.google.com/feeds',
