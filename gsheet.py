@@ -21,8 +21,8 @@ class gsheet(object):
     MEDIUM_ID = 1727754730
     HARD_ID = 609485244
     ELITE_ID = 515954571
-    MASTER_ID = 779677934
-    GOD_ID = 1066915788
+    Extra_ID = 1316949566
+    Pets_ID = 2119535386
     PASSIVE_ID = 334976592
 
     def loadKnownTaskAccounts(self):
@@ -41,6 +41,8 @@ class gsheet(object):
                 range=range_name).execute()
             
             taskAccounts = []
+            if result.get('values') is None:
+                return taskAccounts
             for account in result.get('values'):
                 spreadsheetUrl = account[8]
                 nickname = account[0]
@@ -51,8 +53,8 @@ class gsheet(object):
                 newTaskAccount.mediumProgress = int(account[2])
                 newTaskAccount.hardProgress = int(account[3])
                 newTaskAccount.eliteProgress = int(account[4])
-                newTaskAccount.masterProgress = int(account[5])
-                newTaskAccount.godProgress = int(account[6])
+                newTaskAccount.petsProgress = int(account[5])
+                newTaskAccount.extraProgress = int(account[6])
                 newTaskAccount.lastUpdated = float(account[9])
                 if (account[10]):
                     newTaskAccount.currentTask = account[10]
@@ -78,8 +80,8 @@ class gsheet(object):
                 'Medium!A2:C',
                 'Hard!A2:C',
                 'Elite!A2:C',
-                'Master!A2:C',
-                'God!A2:C',
+                'Pets!A2:C',
+                'Extra!A2:C',
                 'DASHBOARD!B15'
             ]
 
@@ -92,7 +94,7 @@ class gsheet(object):
             for range in result.get('valueRanges'):
                 compl = []
                 if(range.get('range') == 'DASHBOARD!B15'):
-                    if (len(range.get('values')[0]) != 0):
+                    if (range.get('values') and len(range.get('values')[0]) != 0):
                         difficultyCompletions.append(range.get('values')[0][0])
                     else:
                         difficultyCompletions.append('None')
@@ -108,7 +110,7 @@ class gsheet(object):
             for difficultyCompletion in difficultyCompletions[:len(difficultyCompletions) - 1]:
                 count = 0
                 for taskCompletion in difficultyCompletion:
-                    if(len(taskCompletion) != 0):
+                    if(len(taskCompletion) != 0 and taskCompletion == 'x'):
                         count+=1
                 difficultyTotals.append(count)
 
@@ -118,8 +120,8 @@ class gsheet(object):
             taskAccount.mediumProgress = int(difficultyTotals[1])
             taskAccount.hardProgress = int(difficultyTotals[2])
             taskAccount.eliteProgress = int(difficultyTotals[3])
-            taskAccount.masterProgress = int(difficultyTotals[4])
-            taskAccount.godProgress = int(difficultyTotals[5])
+            taskAccount.petsProgress = int(difficultyTotals[4])
+            taskAccount.extraProgress = int(difficultyTotals[5])
             taskAccount.currentTask = currentTask
 
             self.updateLeaderboards(taskAccount)
@@ -141,8 +143,8 @@ class gsheet(object):
             taskAccount.mediumProgress,
             taskAccount.hardProgress,
             taskAccount.eliteProgress,
-            taskAccount.masterProgress,
-            taskAccount.godProgress,
+            taskAccount.petsProgress,
+            taskAccount.extraProgress,
             taskAccount.isOfficial,
             taskAccount.spreadsheetUrl,
             taskAccount.lastUpdated,
@@ -184,8 +186,8 @@ class gsheet(object):
                 'Medium!A2:C',
                 'Hard!A2:C',
                 'Elite!A2:C',
-                'Master!A2:C',
-                'God!A2:C',
+                'Pets!A2:C',
+                'Extra!A2:C',
                 'Passive!A2:C',
             ]
 
@@ -233,11 +235,11 @@ class gsheet(object):
                 self.MEDIUM_ID,
                 self.HARD_ID,
                 self.ELITE_ID,
-                self.MASTER_ID,
-                self.GOD_ID,
+                self.Pets_ID,
+                self.Extra_ID,
                 self.PASSIVE_ID,
             ]
-            sheet_names = ['Easy', 'Medium', 'Hard', 'Elite', 'Master', 'God', 'Passive']
+            sheet_names = ['Easy', 'Medium', 'Hard', 'Elite', 'Pets', 'Extra', 'Passive']
 
             copy_sheet_to_another_spreadsheet_request_body = {
                 'destination_spreadsheet_id': spreadsheetId,
@@ -276,8 +278,8 @@ class gsheet(object):
                 'Medium!A2:A',
                 'Hard!A2:A',
                 'Elite!A2:A',
-                'Master!A2:A',
-                'God!A2:A',
+                'Pets!A2:A',
+                'Extra!A2:A',
                 'Passive!A2:A'
             ]
 
@@ -306,11 +308,20 @@ class gsheet(object):
                         else:
                             completedTaskDictionary[x[0]] = completedTaskDictionary[x[0]] - 1
                     else:
-                        rows.append({
-                            'values': [{
-                                'userEnteredValue': {},
-                            }]
-                        })
+                        if (x[0] == 'Skill pets' or x[0] == 'Other pets'):
+                            rows.append({
+                                'values': [{
+                                    'userEnteredValue': {
+                                        'stringValue': 'Completed' 
+                                    },
+                                }]
+                            })
+                        else:
+                            rows.append({
+                                'values': [{
+                                    'userEnteredValue': {},
+                                }]
+                            })
 
                 update_cells_requests.append({
                     'updateCells': {

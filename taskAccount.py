@@ -8,8 +8,8 @@ class taskAccount(object):
     mediumProgress = 0
     hardProgress = 0
     eliteProgress = 0
-    masterProgress = 0
-    godProgress = 0
+    extraProgress = 0
+    petsProgress = 0
     currentTask = 'Unknown'
     isOfficial = False
 
@@ -24,8 +24,8 @@ class taskAccount(object):
 
     def getAccountInfo(self):
         return (f'**{self.nickname}:** Easy: {self.easyProgress}, Medium: {self.mediumProgress}, \
-            Hard: {self.hardProgress}, Elite: {self.eliteProgress}, Master: {self.masterProgress}, \
-            God: {self.godProgress}\n**Current Task:** {self.currentTask}\n**Time since last update:** \
+            Hard: {self.hardProgress}, Elite: {self.eliteProgress}, Extra: {self.extraProgress}, \
+            Pets: {self.petsProgress}\n**Current Task:** {self.currentTask}\n**Time since last update:** \
             {self.formatTimeSinceUpdate()}').replace("            ", "")
 
     def formatTimeSinceUpdate(self):
