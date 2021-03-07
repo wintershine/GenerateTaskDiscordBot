@@ -10,6 +10,9 @@ class taskAccountList():
     def add(self, taskAccount):
         self.taskAccounts.add(taskAccount)
 
+    def remove(self, taskAccount):
+        self.taskAccounts.remove(taskAccount)
+
     def getOldestUpdatedAccounts(self, n):
         numberOfAccounts = len(list(self.taskAccounts.islice()))
         if(numberOfAccounts == 0):

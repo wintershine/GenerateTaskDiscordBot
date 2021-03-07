@@ -168,6 +168,23 @@ class gsheet(object):
         #Add new row if the account was not on leaderboards yet
         worksheet.append_row(values)
 
+    def deleteAccount(self, accountName):
+        scope = ['https://spreadsheets.google.com/feeds',
+            'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
+        gsclient = gspread.authorize(creds)
+        sheet = gsclient.open_by_key(self.LEADERBOARDS_ID)
+        worksheet = sheet.worksheet("RawData")
+
+        existingAccounts = worksheet.col_values(1)
+
+        for nickname in existingAccounts:
+            if (nickname == accountName):
+                index = existingAccounts.index(nickname) + 1
+                
+                worksheet.delete_row(index)
+                return
+
     def updateSpreadsheetToLatestVersion(self, spreadsheetUrl):
         try:
             scope = ['https://spreadsheets.google.com/feeds',
@@ -405,5 +422,6 @@ class gsheet(object):
             return ts
         except Exception as e:
             return 0
+            
     def getIdFromUrl(self, url):
         return re.search('\/d\/(.*?)(\/|$)', url).group(1)
