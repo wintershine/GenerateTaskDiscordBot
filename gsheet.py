@@ -208,6 +208,16 @@ class gsheet(object):
                 'Passive!A2:C',
             ]
 
+            sheet_names = [
+                'Easy',
+                'Medium',
+                'Hard',
+                'Elite',
+                'Pets',
+                'Extra',
+                'Passive'
+            ]
+
             completionsResult = sheet.values().batchGet(
                 spreadsheetId = spreadsheetId,
                 ranges = range_names,
@@ -228,7 +238,7 @@ class gsheet(object):
             for sh in res.get('sheets'):
                 if(sh.get('properties').get('title') == 'Info'):
                     infoTabId = sh.get('properties').get('sheetId')
-                elif(sh.get('properties').get('title') != 'DASHBOARD'):
+                elif(sh.get('properties').get('title') in sheet_names):
                     sheet_ids.append(sh.get('properties').get('sheetId'))
 
             sheet_delete_requests = []
@@ -256,7 +266,6 @@ class gsheet(object):
                 self.Extra_ID,
                 self.PASSIVE_ID,
             ]
-            sheet_names = ['Easy', 'Medium', 'Hard', 'Elite', 'Pets', 'Extra', 'Passive']
 
             copy_sheet_to_another_spreadsheet_request_body = {
                 'destination_spreadsheet_id': spreadsheetId,
