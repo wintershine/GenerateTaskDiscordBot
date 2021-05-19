@@ -322,18 +322,6 @@ class gsheet(object):
                 for x in range.get('values'):
                     if (x[0] in completedTaskDictionary):
                         # need to append RowData objects, not just a string
-                        rows.append({
-                            'values': [{
-                                'userEnteredValue': {
-                                    'stringValue': 'x' 
-                                },
-                            }]
-                        })
-                        if(completedTaskDictionary[x[0]] < 2):
-                            completedTaskDictionary.pop(x[0])
-                        else:
-                            completedTaskDictionary[x[0]] = completedTaskDictionary[x[0]] - 1
-                    else:
                         if (x[0] == 'Skill pets' or x[0] == 'Other pets'):
                             rows.append({
                                 'values': [{
@@ -345,9 +333,21 @@ class gsheet(object):
                         else:
                             rows.append({
                                 'values': [{
-                                    'userEnteredValue': {},
+                                    'userEnteredValue': {
+                                        'stringValue': 'x' 
+                                    },
                                 }]
                             })
+                        if(completedTaskDictionary[x[0]] < 2):
+                            completedTaskDictionary.pop(x[0])
+                        else:
+                            completedTaskDictionary[x[0]] = completedTaskDictionary[x[0]] - 1
+                    else:
+                        rows.append({
+                            'values': [{
+                                'userEnteredValue': {},
+                            }]
+                        })
 
                 update_cells_requests.append({
                     'updateCells': {
